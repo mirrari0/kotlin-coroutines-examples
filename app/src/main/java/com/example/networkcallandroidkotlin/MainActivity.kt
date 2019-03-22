@@ -2,23 +2,24 @@ package com.example.networkcallandroidkotlin
 
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
+import android.provider.Settings
 import androidx.annotation.WorkerThread
 import kotlinx.android.synthetic.main.activity_main.*
-import kotlinx.coroutines.GlobalScope
-import kotlinx.coroutines.async
+import kotlinx.coroutines.*
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.Response
 import org.json.JSONObject
 
+
 class MainActivity : AppCompatActivity() {
 
     private val HELLO_WORLD_ENDPOINT = "https://secret-wave-44234.herokuapp.com/helloworld"
 
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
-
         RunBlockButton.setOnClickListener {
             getMessageRunblocking()
         }
@@ -29,9 +30,15 @@ class MainActivity : AppCompatActivity() {
         var message = "fetching..."
         OutputDisplay.text = message
 
-        GlobalScope.async {
-            val responseMessage = "RunBlocked Result: " + parseHelloWorldJson(calloutToHelloWorldEndpoint())
-            this@MainActivity.OutputDisplay.text = responseMessage
+        val response = GlobalScope.async(Dispatchers.IO) {
+            calloutToHelloWorldEndpoint()
+        }
+
+        GlobalScope.async(Dispatchers.Main) {
+            runBlocking {
+                message = "RunBlocked Result: " + parseHelloWorldJson(response)
+            }
+            OutputDisplay.text = message
 
         }
     }
@@ -47,9 +54,9 @@ class MainActivity : AppCompatActivity() {
             .execute()
     }
 
-    private fun parseHelloWorldJson(response: Response): String {
+    private suspend fun parseHelloWorldJson(response: Deferred<Response>): String {
         return JSONObject(
-            response
+            response.await()
                 .body()?.string()
         ).getString("message")
     }
